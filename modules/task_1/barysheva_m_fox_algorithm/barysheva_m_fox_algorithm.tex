@@ -1,0 +1,226 @@
+
+\documentclass[12pt]{article}
+\usepackage{lingmacros}
+\usepackage{tree-dvips}
+
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{luainputenc}
+\usepackage[english, russian]{babel}
+\usepackage[pdftex]{hyperref}
+\usepackage[14pt]{extsizes}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{color}
+\usepackage{multicol}
+\usepackage{longtable}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{indentfirst}
+\usepackage{caption}
+
+\geometry{a4paper,top=2cm,bottom=2cm,left=2.5cm,right=1.5cm}
+\setlength{\parskip}{0.5cm}
+
+\lstset{language=C++,
+		basicstyle=\footnotesize,
+		keywordstyle=\color{blue}\ttfamily,
+		stringstyle=\color{red}\ttfamily,
+		commentstyle=\color{green}\ttfamily,
+		morecomment=[l][\color{magenta}]{\#}, 
+		tabsize=4,
+		breaklines=true,
+  		breakatwhitespace=true,
+  		title=\lstname,       
+}
+\renewcommand{\thesubsection}{\arabic{subsection}}
+\makeatletter
+\def\@seccntformat#1{\@ifundefined{#1@cntformat}%
+   {\csname the#1\endcsname\quad}
+   {\csname #1@cntformat\endcsname}}
+\newcommand\section@cntformat{}
+\makeatother
+
+\begin{document}
+
+\begin{titlepage}
+
+\begin{center}
+Министерство науки и высшего образования Российской Федерации
+\end{center}
+
+\begin{center}
+Федеральное государственное автономное образовательное учреждение высшего образования \\
+Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского
+\end{center}
+
+\begin{center}
+Институт информационных технологий, математики и механики
+\end{center}
+
+\vspace{4em}
+
+\begin{center}
+\textbf{\LargeОтчет по лабораторной работе} \\
+\end{center}
+\begin{center}
+\textbf{\LargeУмножение плотных матриц. Элементы типа double. Блочная схема, алгоритм Фокса.} \\
+\end{center}
+
+\vspace{4em}
+
+\newbox{\lbox}
+\savebox{\lbox}{\hbox{text}}
+\newlength{\maxl}
+\setlength{\maxl}{\wd\lbox}
+\hfill\parbox{7cm}{
+\hspace*{5cm}\hspace*{-5cm}\textbf{Выполнила:} \\ студентка группы 381906-2 \\ Барышева М. А. \\
+\\
+\hspace*{5cm}\hspace*{-5cm}\textbf{Проверил:}\\ доцент кафедры МОСТ, \\ кандидат технических наук \\ Сысоев А. В.\\
+}
+\vspace{\fill}
+
+\begin{center} Нижний Новгород \\ 2022 \end{center}
+
+\end{titlepage}
+
+
+\setcounter{page}{2}
+
+% Содержание
+\tableofcontents
+\newpage
+
+\section*{Введение}
+\addcontentsline{toc}{section}{Введение}
+Умножение матриц -- это одна из самых основных математических операций. Существует множество различных алгоритмов умножения матриц, блочные, линейные и т.д.. Прямое использование математического определения умножения матриц даёт алгоритм, занимающий \( O \left( n^{3} \right)  \) времени, что достаточно неэффективно. Разумеется, одни алгоритмы работают в разы быстрее других, но наиболее эффективным способом ускорения реализации умножения является алгоритм распараллеливания.\par
+
+В рамках данной лабораторной работы мы реализуем алгоритм Фокса, используя различные технологии распараллеливания.\par
+
+\newpage
+
+\section*{Цель работы}
+\addcontentsline{toc}{section}{Цель работы}
+В рамках данной лабораторной работы необходимо разработать следующие компоненты:
+
+\begin{itemize}
+	\item Выполнить реализацию последовательного алгоритма умножения матриц;
+
+	\item Выполнить реализацию алгоритма Фокса с использованием технологии OpenMP;
+
+	\item Выполнить реализацию алгоритма Фокса с использованием технологии TBB;
+
+	\item Выполнить реализацию алгоритма Фокса с использованием технологии std::Threads C++11;
+	
+	\item Провести расчет теоретического ускорения и эффективности;
+
+\item Провести ряд тестов. Сравнить ускорение параллельного и не параллельного алгоритма;
+\end{itemize}
+
+\newpage
+
+\section*{Описание алгоритма}
+\addcontentsline{toc}{section}{Описание алгоритма}
+Используется блочная схема разбиения матрицы. При таком способе разделения данных исходные матрицы A, B и результирующая матрица С представляются в виде наборов блоков. Далее предполагается что все матрицы являются квадратными размера $n*n$, количество блоков по горизонтали и вертикали одинаково и равно q (т.е. размер всех блоков равен $k*k$, $k=n/q$). При таком представлении данных операция матричного умножения, например, матрицы А в блочном виде может быть представлена так:\\
+ \begin{equation}A_{00}= \left( \begin{matrix}
+a_{00}  &  a_{01}\\
+a_{10}  &  a_{11}\\
+\end{matrix}
+ \right) ,~~A_{01}= \left( \begin{matrix}
+a_{02}  &   a_{03}\\
+a_{12}  &   a_{13}\\
+\end{matrix}
+ \right) , A_{10}= \left( \begin{matrix}
+a_{20}  &  a_{21}\\
+a_{30}  &  a_{31}\\
+\end{matrix}
+ \right) ,~~A_{11}= \left( \begin{matrix}
+a_{22}  &  a_{23}\\
+a_{32}  &  a_{33}\\
+\end{matrix}
+ \right)  \end{equation} 
+Каждый блок результирующей матрицы С определяется по формуле:
+\begin{equation}
+  C=A \times B=a_{i0}b_{0j}+a_{i1}b_{1j}+ \ldots +a_{i,n-1}b_{n-1,j}= \sum _{k=0}^{n-1}a_{ik}b_{kj} 
+\end{equation}
+
+
+\newpage
+
+\section*{Методы распараллеливания}
+\addcontentsline{toc}{section}{Методы распараллеливания}
+Для начала создаются подзадачи вычисления отдельных блоков матрицы C,  при этом в подзадачах на каждой итерации расчетов располагается только по одному блоку исходных матриц A и B. Для нумерации подзадач будем использовать индексы размещаемых в подзадачах блоков матрицы C, т.е. подзадача $(i,j)$ отвечает за вычисление блока $C_{i,j}$ – тем самым, набор подзадач образует квадратную решетку, соответствующую структуре блочного представления матрицы C.  
+\subsection{Реализация OpenMP}
+\textit{Для распараллеливания используется директива $\#$ pragma omp parallel.}\\ \\
+Каждому потоку присваивается некоторая характеристика – координаты в схеме. Они показывают, в какой блок результирующей матрицы будет записан ответ по завершении работы потока. На каждой итерации шагаем от 0 до $q$, где  $ q=\sqrt[]{num \_ threads}$, высчитывая нужный индекс по формуле $k\_bar$ = $(thread\_i+step)$ $\%$  $q$. Перемножаем соответствующие блоки в строке и столбце во временную результирующую матрицу tmp и суммируем с результирующей матрицей C. Эффективность высчитываем с помощью функции \textit{omp\_get\_wtime()}. 
+
+\subsection{Реализация TBB}
+Реализация в TBB основана на структуре \textit{blocked\_range2d} -- двумерного пространства для разбиения блоков и функции \textit{parallel\_for}, которая принимает lambda-функцию, перемножающую соответствующие блоки в строке и столбце во временную результирующую матрицу tmp и суммирующую с результирующей матрицей C. Эффективность высчитываем с помощью функции \textit{tbb::tick\_count}.
+
+\subsection{Реализация std::threads}
+В данной реализации мы создаём некоторое число потоков \textit{std::vector<std::thread> threads(q * q)}, которым при конструировании в качестве параметра передаём lambda-функцию, перемножающую соответствующие блоки в строке и столбце во временную результирующую матрицу tmp и суммирующую с результирующей матрицей C. Эффективность высчитываем с помощью функции \textit{CLOCKS\_PER\_SEC}.
+
+\newpage
+
+\section*{Тестирование}
+\addcontentsline{toc}{section}{Тестирование}
+Для проверки правильности алгоритмов была использована библиотека модульного тестирования Google C++ Testing Framework.
+
+\newpage
+
+\section*{Результаты экспериментов}
+\addcontentsline{toc}{section}{Результаты экспериментов}
+\begin{itemize}
+	\item Операционная система: Windows 8.1
+	\item Процессор: 
+	Intel(R) Core(TM) i5-3210M CPU @ 2.50GHz\\
+	Максимальная скорость:	2,50 ГГц\\
+	Сокетов:	1\\
+	Ядра:	2\\
+	Логических процессоров:	4
+	\item RAM: 8 Gb
+\end{itemize}
+\begin{center}
+    
+
+\begin{table}[!h]
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|c|c|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{Размер матрицы} & Последовательное выполнение & \multicolumn{2}{c|}{OpenMP} & \multicolumn{2}{c|}{TBB} & \multicolumn{2}{c|}{std::threads} \\ \cline{2-8} 
+     & Время, сек & Время, сек & Ускорение & Время, сек & Ускорение & Время, сек & Ускорение \\ \hline
+500  & 2.64       & 1.23       & 2.14      & 1.24       & 2.12      & 1.22       & 2.16      \\ \hline
+1000 & 21.92      & 12.41      & 1.76      & 12.24      & 1.79      & 11.75      & 1.86      \\ \hline
+\end{tabular}
+}
+\caption{Результаты экспериментов}
+\end{table}
+\end{center}
+
+
+\newpage
+
+\section*{Заключение}
+\addcontentsline{toc}{section}{Заключение}
+В результате данной лабораторной работы был изучен алгоритм Фокса параллельного умножения матриц, получен навык работы со стандартами для распараллеливания OpenMP, TBB, std::threads. Тесты работают, параллельные вычисления имеют существенное ускорение в сравнении с последовательными.\par
+
+\newpage
+
+\begin{thebibliography}{}
+\addcontentsline{toc}{section}{Список литературы и ссылок}
+\bibitem{Sysoev} Сысоев А.В., Мееров И.Б., Свистунов А.Н., Курылев А.Л., Сенин А.В., Шишков А.В., Корняков К.В., Сиднев А.А. «Параллельное программирование в системах с общей памятью. Инструментальная поддержка». Учебно-методические материалы по программе повышения квалификации «Технологии высокопроизводительных вычислений для обеспечения учебного процесса и научных исследований». Нижний Новгород, 2007, 110 с. 
+\bibitem{Fox algorithm} Алгоритм Фокса перемножения матриц [Электронный ресурс] // URL: http://www.hpcc.unn.ru/?dir=1034
+
+
+\end{thebibliography}
+
+\newpage
+
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+Код, написанный в рамках лабораторной работы представлен в следующем репозитории.
+\begin{lstlisting}
+https://github.com/MBarysheva/pp_2022_spring
+\end{lstlisting}
+\end{document}
