@@ -188,10 +188,11 @@ a_{32}  &  a_{33}\\
 \resizebox{\textwidth}{!}{
 \begin{tabular}{|c|c|c|c|c|c|c|c|}
 \hline
-\multirow{2}{*}{Размер матрицы} & Последовательное выполнение & \multicolumn{2}{c|}{OpenMP} & \multicolumn{2}{c|}{TBB} & \multicolumn{2}{c|}{std::threads} \\ \cline{2-8} 
+\multirow{2}{*}{Размер матрицы} & Последовательное выполнение & \multicolumn{2}{c|}{TBB} & \multicolumn{2}{c|}{OpenMP} & \multicolumn{2}{c|}{std::threads} \\ \cline{2-8} 
      & Время, сек & Время, сек & Ускорение & Время, сек & Ускорение & Время, сек & Ускорение \\ \hline
-500  & 2.64       & 1.23       & 2.14      & 1.24       & 2.12      & 1.22       & 2.16      \\ \hline
-1000 & 21.92      & 12.41      & 1.76      & 12.24      & 1.79      & 11.75      & 1.86      \\ \hline
+100  & 0.159       & 0.046   & 2.22     & 0.07       & 1.81      & 0.099       & 1.55      \\ \hline
+500  & 12.26       & 5.19      & 2.36      & 5.27       & 2.6      & 5.1       & 2.7      \\ \hline
+800 & 50.92      & 20.75      & 2.34      & 21.8      & 2.25      & 23.77      & 2.14      \\ \hline
 \end{tabular}
 }
 \caption{Результаты экспериментов}
@@ -219,8 +220,1074 @@ a_{32}  &  a_{33}\\
 
 \section*{Приложение}
 \addcontentsline{toc}{section}{Приложение}
-Код, написанный в рамках лабораторной работы представлен в следующем репозитории.
+Код, написанный в рамках лабораторной работы:
+\par Задача 1. 
 \begin{lstlisting}
-https://github.com/MBarysheva/pp_2022_spring
+//.h
+// Copyright 2022 Barysheva Maria
+#ifndef MODULES_TASK_1_BARYSHEVA_M_FOXS_ALGORITHM_FOXS_ALGORITHM_H_
+#define MODULES_TASK_1_BARYSHEVA_M_FOXS_ALGORITHM_FOXS_ALGORITHM_H_
+
+#include <vector>
+
+std::vector<std::vector<double>> GetRandomMatrix(const int& size);
+std::vector<std::vector<double>> SimpleMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+std::vector<std::vector<double>> BlockMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+bool CompareMatrix(const std::vector<std::vector<double>>& A,
+                   const std::vector<std::vector<double>>& B);
+
+#endif  // MODULES_TASK_1_BARYSHEVA_M_FOXS_ALGORITHM_FOXS_ALGORITHM_H_
+\end{lstlisting}
+\begin{lstlisting}
+//.cpp
+// Copyright 2022 Barysheva Maria
+
+#include "../../../modules/task_1/barysheva_m_foxs_algorithm/foxs_algorithm.h"
+
+#include <algorithm>
+#include <iostream>
+#include <limits>
+#include <random>
+#include <vector>
+
+std::vector<std::vector<double>> GetRandomMatrix(const int& size) {
+  if (size <= 0) {
+    throw "Wrong size matrix";
+  }
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(0.0, 1000.0);
+
+  std::vector<std::vector<double>> res(size, std::vector<double>(size));
+  for (int i = 0; i < size; i++) {
+    for (int j = 0; j < size; j++) {
+      res[i][j] = dis(gen);
+    }
+  }
+  return res;
+}
+
+std::vector<std::vector<double>> SimpleMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t m = B[0].size();
+  std::vector<std::vector<double>> C(n, std::vector<double>(n, 0));
+
+  for (size_t i = 0; i < n; ++i) {
+    for (size_t j = 0; j < m; ++j) {
+      for (size_t k = 0; k < B.size(); ++k) {
+        C[i][j] += A[i][k] * B[k][j];
+      }
+    }
+  }
+  return C;
+}
+
+std::vector<std::vector<double>> BlockMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t q = n / std::sqrt(n);
+  size_t BlockSize = n / q;
+  std::vector<std::vector<double>> C(n, std::vector<double>(n, 0));
+  size_t EndA, EndB;
+  for (size_t a = 0; a < n; a += BlockSize) {
+    EndA = std::min(a + BlockSize, n);
+    for (size_t b = 0; b < n; b += BlockSize) {
+      EndB = std::min(b + BlockSize, n);
+      for (size_t i = 0; i < n; i++) {
+        for (size_t j = a; j < EndA; j++) {
+          for (size_t k = b; k < EndB; k++) {
+            C[i][j] += A[i][k] * B[k][j];
+          }
+        }
+      }
+    }
+  }
+  return C;
+}
+
+bool CompareMatrix(const std::vector<std::vector<double>>& A,
+                   const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  bool eq = true;
+  for (size_t i = 0; i < A.size(); i++) {
+    for (size_t j = 0; j < A[0].size(); j++)
+      if (std::fabs(A[i][j] - B[i][j]) >
+          std::numeric_limits<double>::epsilon() * std::max(A[i][j], B[i][j]) *
+              100)
+        eq = false;
+  }
+  return eq;
+} 
+\end{lstlisting}
+\begin{lstlisting}
+//main.cpp
+// Copyright 2022 Barysheva Maria
+#include <gtest/gtest.h>
+
+#include "../barysheva_m_foxs_algorithm/foxs_algorithm.h"
+
+TEST(SequentialBarysheva, Get_Random_Matrix) {
+  ASSERT_NO_THROW(GetRandomMatrix(10));
+}
+
+TEST(SequentialBarysheva, Get_Matrix_On_Negative_Size) {
+  ASSERT_ANY_THROW(GetRandomMatrix(-1));
+}
+
+TEST(SequentialBarysheva, Simple_Mult_With_Different_Size) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(8);
+  ASSERT_ANY_THROW(SimpleMultiplication(A, B));
+}
+
+TEST(SequentialBarysheva, Simple_Mult_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> C = {
+      {53.62, 61.19, 57.83}, {29.68, 33.71, 37.61}, {57.92, 62.87, 77.61}};
+
+  ASSERT_EQ(CompareMatrix(SimpleMultiplication(A, B), C), true);
+}
+
+TEST(SequentialBarysheva, Block_Mult_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> C = {
+      {53.62, 61.19, 57.83}, {29.68, 33.71, 37.61}, {57.92, 62.87, 77.61}};
+
+  ASSERT_EQ(CompareMatrix(BlockMultiplication(A, B), C), true);
+}
+
+TEST(SequentialBarysheva, Block_And_Simple_Is_Same) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(6);
+  std::vector<std::vector<double>> B = GetRandomMatrix(6);
+  ASSERT_EQ(
+      CompareMatrix(SimpleMultiplication(A, B), BlockMultiplication(A, B)),
+      true);
+}
+
+\end{lstlisting}
+\par Задача 2.
+\begin{lstlisting}
+//.h
+// Copyright 2022 Barysheva Maria
+#ifndef MODULES_TASK_2_BARYSHEVA_M_FOX_ALGORITHM_OPMP_FOX_ALGORITHM_OPMP_H_
+#define MODULES_TASK_2_BARYSHEVA_M_FOX_ALGORITHM_OPMP_FOX_ALGORITHM_OPMP_H_
+
+#include <cmath>
+#include <vector>
+
+std::vector<std::vector<double>> GetRandomMatrix(const int& n);
+std::vector<std::vector<double>> SimpleMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+std::vector<std::vector<double>> BlockMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+
+std::vector<std::vector<double>> FoxParallel(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B, const unsigned& thread);
+
+bool CompareMatrix(const std::vector<std::vector<double>>& A,
+                   const std::vector<std::vector<double>>& B);
+
+#endif  // MODULES_TASK_2_BARYSHEVA_M_FOX_ALGORITHM_OPMP_FOX_ALGORITHM_OPMP_H_
+\end{lstlisting}
+\begin{lstlisting}
+//.cpp
+// Copyright 2022 Barysheva Maria
+#include "../../../modules/task_2/barysheva_m_fox_algorithm_opmp/fox_algorithm_opmp.h"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <limits>
+#include <random>
+#include <vector>
+
+std::vector<std::vector<double>> GetRandomMatrix(const int& size) {
+  if (size <= 0) {
+    throw "Wrong size matrix";
+  }
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(0.0, 1000.0);
+
+  std::vector<std::vector<double>> res(size, std::vector<double>(size));
+  for (int i = 0; i < size; i++) {
+    for (int j = 0; j < size; j++) {
+      res[i][j] = dis(gen);
+    }
+  }
+  return res;
+}
+
+std::vector<std::vector<double>> SimpleMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t m = B[0].size();
+  std::vector<std::vector<double>> C(n, std::vector<double>(n, 0));
+
+  for (size_t i = 0; i < n; ++i) {
+    for (size_t j = 0; j < m; ++j) {
+      for (size_t k = 0; k < B.size(); ++k) {
+        C[i][j] += A[i][k] * B[k][j];
+      }
+    }
+  }
+  return C;
+}
+
+std::vector<std::vector<double>> BlockMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t q = n / std::sqrt(n);
+  size_t BlockSize = n / q;
+  std::vector<std::vector<double>> C(n, std::vector<double>(n, 0));
+  size_t EndA, EndB;
+  for (size_t a = 0; a < n; a += BlockSize) {
+    EndA = std::min(a + BlockSize, n);
+    for (size_t b = 0; b < n; b += BlockSize) {
+      EndB = std::min(b + BlockSize, n);
+      for (size_t i = 0; i < n; i++) {
+        for (size_t j = a; j < EndA; j++) {
+          for (size_t k = b; k < EndB; k++) {
+            C[i][j] += A[i][k] * B[k][j];
+          }
+        }
+      }
+    }
+  }
+  return C;
+}
+
+bool CompareMatrix(const std::vector<std::vector<double>>& A,
+                   const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  bool eq = true;
+  for (size_t i = 0; i < A.size(); i++) {
+    for (size_t j = 0; j < A[0].size(); j++)
+      if (std::fabs(A[i][j] - B[i][j]) >
+          std::numeric_limits<double>::epsilon() * std::max(A[i][j], B[i][j]) *
+              100)
+        eq = false;
+  }
+  return eq;
+}
+
+std::vector<std::vector<double>> FoxParallel(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B, const unsigned& thread) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t q = std::sqrt(thread);
+  size_t BlockSize = n / q;
+
+  auto A1 = A;
+  auto B1 = B;
+
+  auto nold = n;
+  while (n % q != 0) {
+    A1.push_back(std::vector<double>(n, 0));
+    B1.push_back(std::vector<double>(n, 0));
+    std::for_each(A1.begin(), A1.end(),
+                  [](std::vector<double>& a) { a.push_back(0); });
+    std::for_each(B1.begin(), B1.end(),
+                  [](std::vector<double>& a) { a.push_back(0); });
+    n++;
+    BlockSize = n / q;
+  }
+
+  std::vector<std::vector<double>> C(n, std::vector<double>(n));
+#pragma omp parallel num_threads(q* q)
+  {
+    std::vector<std::vector<double>> A(BlockSize);
+    std::vector<std::vector<double>> B(BlockSize);
+
+    std::vector<std::vector<double>> tmp(BlockSize,
+                                         std::vector<double>(BlockSize, 0));
+    for (size_t s = 0; s < q; s++) {
+      for (size_t k = 0; k < BlockSize; k++) {
+        A[k] = std::vector<double>(
+            A1[omp_get_thread_num() / q * BlockSize + k].begin() +
+                ((omp_get_thread_num() / q + s) % q * BlockSize),
+            A1[omp_get_thread_num() / q * BlockSize + k].begin() +
+                ((omp_get_thread_num() / q + s) % q * BlockSize + BlockSize));
+        B[k] = std::vector<double>(
+            B1[(omp_get_thread_num() / q + s) % q * BlockSize + k].begin() +
+                (omp_get_thread_num() % q * BlockSize),
+            B1[(omp_get_thread_num() / q + s) % q * BlockSize + k].begin() +
+                (omp_get_thread_num() % q * BlockSize + BlockSize));
+      }
+      for (size_t i = 0; i < BlockSize; i++) {
+        for (size_t j = 0; j < BlockSize; j++) {
+          for (size_t l = 0; l < BlockSize; l++) tmp[i][j] += A[i][l] * B[l][j];
+        }
+      }
+    }
+
+    for (size_t i = 0; i < BlockSize; ++i) {
+      for (size_t j = 0; j < BlockSize; ++j) {
+        C[i + omp_get_thread_num() / q * BlockSize]
+         [j + omp_get_thread_num() % q * BlockSize] = tmp[i][j];
+      }
+    }
+  }
+
+  if (n != nold) {
+#pragma omp parallel for
+    for (int i = 0; i < static_cast<int>(nold); i++) {
+      C[i].resize(nold);
+    }
+  }
+  C.resize(nold);
+  return C;
+}
+\end{lstlisting}
+\begin{lstlisting}
+//main.cpp
+// Copyright 2022 Barysheva Maria
+#include <gtest/gtest.h>
+#include <omp.h>
+
+#include <vector>
+
+#include "./fox_algorithm_opmp.h"
+TEST(OMPBarysheva, Get_Random_Matrix) { ASSERT_NO_THROW(GetRandomMatrix(10)); }
+
+TEST(OMPBarysheva, Get_Matrix_On_Negative_Size) {
+  ASSERT_ANY_THROW(GetRandomMatrix(-1));
+}
+
+TEST(OMPBarysheva, Can_Mult_Not_Same_Matrix) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(6);
+
+  ASSERT_ANY_THROW(FoxParallel(A, B, 2));
+}
+
+TEST(OMPBarysheva, Can_Parallel_Mult_The_Same_Matrix_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> C = {
+      {53.62, 61.19, 57.83}, {29.68, 33.71, 37.61}, {57.92, 62.87, 77.61}};
+  std::vector<std::vector<double>> res = FoxParallel(A, B, 2);
+
+  ASSERT_TRUE(CompareMatrix(res, C));
+}
+
+TEST(OMPBarysheva, Simple_And_Parallel_The_Same_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> res1 = SimpleMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B, 2);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(OMPBarysheva, Block_And_Parallel_The_Same_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> res1 = BlockMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B, 2);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(OMPBarysheva, Simple_And_Parallel_The_Same_5x5) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(5);
+  std::vector<std::vector<double>> res1 = SimpleMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B, 2);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(OMPBarysheva, Block_And_Parallel_The_Same_5x5) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(5);
+  std::vector<std::vector<double>> res1 = BlockMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B, 2);
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+\end{lstlisting}
+\par Задача 3.
+\begin{lstlisting}
+//.h
+// Copyright 2022 Barysheva Maria
+#ifndef MODULES_TASK_3_BARYSHEVA_M_FOX_ALGORITHM_TBB_FOX_ALGORITHM_H_
+#define MODULES_TASK_3_BARYSHEVA_M_FOX_ALGORITHM_TBB_FOX_ALGORITHM_H_
+
+#include <cmath>
+#include <vector>
+
+std::vector<std::vector<double>> GetRandomMatrix(const int& n);
+std::vector<std::vector<double>> SimpleMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+std::vector<std::vector<double>> BlockMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+
+std::vector<std::vector<double>> FoxParallel(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+
+bool CompareMatrix(const std::vector<std::vector<double>>& A,
+                   const std::vector<std::vector<double>>& B);
+
+#endif  // MODULES_TASK_3_BARYSHEVA_M_FOX_ALGORITHM_TBB_FOX_ALGORITHM_H_
+\end{lstlisting}
+\begin{lstlisting}
+//.cpp
+// Copyright 2022 Barysheva Maria
+#include "../../../modules/task_3/barysheva_m_fox_algorithm_tbb/fox_algorithm.h"
+
+#include <tbb/blocked_range.h>
+#include <tbb/blocked_range2d.h>
+#include <tbb/parallel_for.h>
+#include <tbb/task_scheduler_init.h>
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <random>
+#include <vector>
+
+std::vector<std::vector<double>> GetRandomMatrix(const int& size) {
+  if (size <= 0) {
+    throw "Wrong size matrix";
+  }
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(0.0, 1000.0);
+
+  std::vector<std::vector<double>> C(size, std::vector<double>(size));
+  for (int i = 0; i < size; i++) {
+    for (int j = 0; j < size; j++) {
+      C[i][j] = dis(gen);
+    }
+  }
+  return C;
+}
+
+std::vector<std::vector<double>> SimpleMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t m = B[0].size();
+  std::vector<std::vector<double>> C(n, std::vector<double>(n, 0));
+
+  for (size_t i = 0; i < n; ++i) {
+    for (size_t j = 0; j < m; ++j) {
+      for (size_t k = 0; k < B.size(); ++k) {
+        C[i][j] += A[i][k] * B[k][j];
+      }
+    }
+  }
+  return C;
+}
+
+std::vector<std::vector<double>> BlockMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t q = n / std::sqrt(n);
+  size_t BlockSize = n / q;
+  std::vector<std::vector<double>> C(n, std::vector<double>(n, 0));
+  size_t EndA, EndB;
+  for (size_t a = 0; a < n; a += BlockSize) {
+    EndA = std::min(a + BlockSize, n);
+    for (size_t b = 0; b < n; b += BlockSize) {
+      EndB = std::min(b + BlockSize, n);
+      for (size_t i = 0; i < n; i++) {
+        for (size_t j = a; j < EndA; j++) {
+          for (size_t k = b; k < EndB; k++) {
+            C[i][j] += A[i][k] * B[k][j];
+          }
+        }
+      }
+    }
+  }
+  return C;
+}
+
+bool CompareMatrix(const std::vector<std::vector<double>>& A,
+                   const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  bool eq = true;
+  for (size_t i = 0; i < A.size(); i++) {
+    for (size_t j = 0; j < A[0].size(); j++)
+      if (std::fabs(A[i][j] - B[i][j]) >
+          std::numeric_limits<double>::epsilon() * std::max(A[i][j], B[i][j]) *
+              100)
+        eq = false;
+  }
+  return eq;
+}
+
+std::vector<std::vector<double>> FoxParallel(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  tbb::task_scheduler_init init;
+  size_t n = A.size();
+  size_t q = std::sqrt(init.default_num_threads());
+  size_t BlockSize = n / q;
+  size_t nold = n;
+
+  std::vector<std::vector<double>> EndA = A;
+  std::vector<std::vector<double>> EndB = B;
+
+  while (n % q != 0) {
+    EndA.push_back(std::vector<double>(n, 0));
+    EndB.push_back(std::vector<double>(n, 0));
+    std::for_each(EndA.begin(), EndA.end(),
+                  [](std::vector<double>& a) { a.push_back(0); });
+    std::for_each(EndB.begin(), EndB.end(),
+                  [](std::vector<double>& a) { a.push_back(0); });
+    n++;
+    BlockSize = n / q;
+  }
+
+  std::vector<std::vector<double>> C(n, std::vector<double>(n));
+  BlockSize = n / q;
+
+  tbb::parallel_for(
+      tbb::blocked_range2d<size_t>(0, n, BlockSize, 0, n, BlockSize),
+      [&](const tbb::blocked_range2d<size_t>& r) {
+        std::vector<std::vector<double>> A1(BlockSize), B1(BlockSize);
+        std::vector<std::vector<double>> tmp(BlockSize,
+                                             std::vector<double>(BlockSize, 0));
+
+        for (size_t m = 0; m < q; m++) {
+          for (size_t n = 0; n < BlockSize; n++) {
+            A1[n] = std::vector<double>(
+                EndA[r.rows().begin() + n].begin() +
+                    (((r.rows().begin() / BlockSize) + m) % q) * BlockSize,
+                EndA[r.rows().begin() + n].begin() +
+                    (((r.rows().begin() / BlockSize) + m) % q) * BlockSize +
+                    BlockSize);
+            B1[n] = std::vector<double>(
+                EndB[(((r.rows().begin() / BlockSize) + m) % q) * BlockSize + n]
+                        .begin() +
+                    r.cols().begin(),
+                EndB[(((r.rows().begin() / BlockSize) + m) % q) * BlockSize + n]
+                        .begin() +
+                    (r.cols().begin() + BlockSize));
+          }
+          for (size_t i = 0; i < BlockSize; i++) {
+            for (size_t j = 0; j < BlockSize; j++) {
+              for (size_t k = 0; k < BlockSize; k++)
+                tmp[i][j] += A1[i][k] * B1[k][j];
+            }
+          }
+        }
+
+        for (size_t i = 0; i < BlockSize; i++) {
+          for (size_t j = 0; j < BlockSize; j++) {
+            C[i + r.rows().begin()][j + r.cols().begin()] = tmp[i][j];
+          }
+        }
+      });
+
+  if (nold != n) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
+                      [&](const tbb::blocked_range<size_t>& r) {
+                        for (size_t i = r.begin(); i < r.end(); i++) {
+                          C[i].resize(nold);
+                        }
+                      });
+  }
+  C.resize(nold);
+  return C;
+}
+\end{lstlisting}
+\begin{lstlisting}
+//main.cpp
+// Copyright 2022 Barysheva Maria
+#include <gtest/gtest.h>
+#include <tbb/tbb.h>
+
+#include "../barysheva_m_fox_algorithm_tbb/fox_algorithm.h"
+
+TEST(TBBBarysheva, Get_Random_Matrix) { ASSERT_NO_THROW(GetRandomMatrix(10)); }
+
+TEST(TBBBarysheva, Get_Matrix_On_Negative_Size) {
+  ASSERT_ANY_THROW(GetRandomMatrix(-1));
+}
+
+TEST(TBBBarysheva, Can_Mult_Not_Same_Matrix) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(6);
+
+  ASSERT_ANY_THROW(FoxParallel(A, B));
+}
+
+TEST(TBBBarysheva, Can_Parallel_Mult_The_Same_Matrix_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> C = {
+      {53.62, 61.19, 57.83}, {29.68, 33.71, 37.61}, {57.92, 62.87, 77.61}};
+  std::vector<std::vector<double>> res = FoxParallel(A, B);
+
+  ASSERT_TRUE(CompareMatrix(res, C));
+}
+
+TEST(TBBBarysheva, Simple_And_Parallel_The_Same_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> res1 = SimpleMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(TBBBarysheva, Block_And_Parallel_The_Same_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> res1 = BlockMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(TBBBarysheva, Simple_And_Parallel_The_Same_5x5) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(5);
+  std::vector<std::vector<double>> res1 = SimpleMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(TBBBarysheva, Block_And_Parallel_The_Same_5x5) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(5);
+  std::vector<std::vector<double>> res1 = BlockMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(TBBBarysheva, Simple_And_Parallel_The_Same_20x20) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(20);
+  std::vector<std::vector<double>> B = GetRandomMatrix(20);
+  std::vector<std::vector<double>> res1 = SimpleMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+\end{lstlisting}
+\par Задача 4.
+\begin{lstlisting}
+//.h
+// Copyright 2022 Barysheva Maria
+
+#ifndef MODULES_TASK_4_BARYSHEVA_M_FOX_ALGORITHM_STD_FOX_ALGORITHM_STD_H_
+
+#define MODULES_TASK_4_BARYSHEVA_M_FOX_ALGORITHM_STD_FOX_ALGORITHM_STD_H_
+#include <cmath>
+#include <vector>
+
+std::vector<std::vector<double>> GetRandomMatrix(const int& n);
+std::vector<std::vector<double>> SimpleMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+std::vector<std::vector<double>> BlockMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+
+std::vector<std::vector<double>> FoxParallel(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B);
+
+bool CompareMatrix(const std::vector<std::vector<double>>& A,
+                   const std::vector<std::vector<double>>& B);
+
+#endif  // MODULES_TASK_4_BARYSHEVA_M_FOX_ALGORITHM_STD_FOX_ALGORITHM_STD_H_
+
+\end{lstlisting}
+\begin{lstlisting}
+//.cpp
+// Copyright 2022 Barysheva Maria
+
+#include "../../../modules/task_4/barysheva_m_fox_algorithm_std/fox_algorithm_std.h"
+
+#include <iostream>
+#include <random>
+#include <utility>
+#include <cmath>
+#include <vector>
+#include <algorithm>
+
+#include "../../../3rdparty/unapproved/unapproved.h"
+
+std::vector<std::vector<double>> GetRandomMatrix(const int& size) {
+  if (size <= 0) {
+    throw "Wrong size matrix";
+  }
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(0.0, 1000.0);
+
+  std::vector<std::vector<double>> res(size, std::vector<double>(size));
+  for (int i = 0; i < size; i++) {
+    for (int j = 0; j < size; j++) {
+      res[i][j] = dis(gen);
+    }
+  }
+  return res;
+}
+
+std::vector<std::vector<double>> SimpleMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t m = B[0].size();
+  std::vector<std::vector<double>> C(n, std::vector<double>(n, 0));
+
+  for (size_t i = 0; i < n; ++i) {
+    for (size_t j = 0; j < m; ++j) {
+      for (size_t k = 0; k < B.size(); ++k) {
+        C[i][j] += A[i][k] * B[k][j];
+      }
+    }
+  }
+  return C;
+}
+
+std::vector<std::vector<double>> BlockMultiplication(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t q = n / std::sqrt(n);
+  size_t BlockSize = n / q;
+  std::vector<std::vector<double>> C(n, std::vector<double>(n, 0));
+  size_t EndA, EndB;
+  for (size_t a = 0; a < n; a += BlockSize) {
+    EndA = std::min(a + BlockSize, n);
+    for (size_t b = 0; b < n; b += BlockSize) {
+      EndB = std::min(b + BlockSize, n);
+      for (size_t i = 0; i < n; i++) {
+        for (size_t j = a; j < EndA; j++) {
+          for (size_t k = b; k < EndB; k++) {
+            C[i][j] += A[i][k] * B[k][j];
+          }
+        }
+      }
+    }
+  }
+  return C;
+}
+
+bool CompareMatrix(const std::vector<std::vector<double>>& A,
+                   const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  bool eq = true;
+  for (size_t i = 0; i < A.size(); i++) {
+    for (size_t j = 0; j < A[0].size(); j++)
+      if (std::fabs(A[i][j] - B[i][j]) >
+          std::numeric_limits<double>::epsilon() * std::max(A[i][j], B[i][j]) *
+              100)
+        eq = false;
+  }
+  return eq;
+}
+
+std::vector<std::vector<double>> FoxParallel(
+    const std::vector<std::vector<double>>& A,
+    const std::vector<std::vector<double>>& B) {
+  if (A.size() != B.size()) {
+    throw "Different size";
+  }
+  if (A.size() <= 0 || B.size() <= 0) {
+    throw "Size of matrix must be > 0";
+  }
+
+  size_t n = A.size();
+  size_t q = std::sqrt(std::thread::hardware_concurrency());
+  size_t BlockSize = n / q;
+  size_t nold = n;
+
+  std::vector<std::vector<double>> EndA = A;
+  std::vector<std::vector<double>> EndB = B;
+
+  while (n % q != 0) {
+    EndA.push_back(std::vector<double>(n, 0));
+    EndB.push_back(std::vector<double>(n, 0));
+    std::for_each(EndA.begin(), EndA.end(),
+                  [](std::vector<double>& a) { a.push_back(0); });
+    std::for_each(EndB.begin(), EndB.end(),
+                  [](std::vector<double>& a) { a.push_back(0); });
+    n++;
+    BlockSize = n / q;
+  }
+
+  std::vector<std::vector<double>> C(n, std::vector<double>(n));
+
+  auto f = [&](const int& x) {
+    std::vector<std::vector<double>> A1(BlockSize), B1(BlockSize),
+        tmp(BlockSize, std::vector<double>(BlockSize, 0));
+
+    for (size_t n = 0; n < q; n++) {
+      for (size_t m = 0; m < BlockSize; m++) {
+        A1[m] = std::vector<double>(
+            EndA[x / q * BlockSize + m].begin() + ((x / q + n) % q * BlockSize),
+            EndA[x / q * BlockSize + m].begin() +
+                ((x / q + n) % q * BlockSize + BlockSize));
+        B1[m] = std::vector<double>(
+            EndB[(x / q + n) % q * BlockSize + m].begin() + (x % q * BlockSize),
+            EndB[(x / q + n) % q * BlockSize + m].begin() +
+                (x % q * BlockSize + BlockSize));
+      }
+      for (size_t i = 0; i < BlockSize; i++) {
+        for (size_t j = 0; j < BlockSize; j++) {
+          for (size_t k = 0; k < BlockSize; k++)
+            tmp[i][j] += A1[i][k] * B1[k][j];
+        }
+      }
+    }
+
+    for (size_t i = 0; i < BlockSize; i++) {
+      for (size_t j = 0; j < BlockSize; j++) {
+        C[i + x / q * BlockSize][j + x % q * BlockSize] = tmp[i][j];
+      }
+    }
+  };
+
+  std::vector<std::thread> threads(q * q);
+  for (size_t i = 0; i < threads.size(); i++) {
+    threads[i] = std::thread(f, i);
+  }
+  for (size_t i = 0; i < threads.size(); i++) {
+    threads[i].join();
+  }
+  if (n != nold) {
+    std::for_each(C.begin(), C.end(),
+                  [&](std::vector<double>& a) { a.resize(nold); });
+    C.resize(nold);
+  }
+  return C;
+}
+\end{lstlisting}
+\begin{lstlisting}
+//main.cpp
+// Copyright 2022 Barysheva Maria
+#include <gtest/gtest.h>
+
+#include <vector>
+
+#include "./fox_algorithm_std.h"
+
+TEST(STDBarysheva, Get_Random_Matrix) { ASSERT_NO_THROW(GetRandomMatrix(10)); }
+
+TEST(STDBarysheva, Get_Matrix_On_Negative_Size) {
+  ASSERT_ANY_THROW(GetRandomMatrix(-1));
+}
+
+TEST(STDBarysheva, Can_Mult_Not_Same_Matrix) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(6);
+
+  ASSERT_ANY_THROW(FoxParallel(A, B));
+}
+
+TEST(STDBarysheva, Can_Parallel_Mult_The_Same_Matrix_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> C = {
+      {53.62, 61.19, 57.83}, {29.68, 33.71, 37.61}, {57.92, 62.87, 77.61}};
+  std::vector<std::vector<double>> res = FoxParallel(A, B);
+
+  ASSERT_TRUE(CompareMatrix(res, C));
+}
+
+TEST(STDBarysheva, Simple_And_Parallel_The_Same_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> res1 = SimpleMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(STDBarysheva, Block_And_Parallel_The_Same_3x3) {
+  std::vector<std::vector<double>> A = {
+      {1.1, 7.9, 4.5}, {2.9, 2.2, 1.8}, {7.3, 2.1, 3.3}};
+  std::vector<std::vector<double>> B = {
+      {4.4, 5.9, 6.9}, {2.7, 5.5, 2.6}, {6.1, 2.5, 6.6}};
+  std::vector<std::vector<double>> res1 = BlockMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(STDBarysheva, Simple_And_Parallel_The_Same_5x5) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(5);
+  std::vector<std::vector<double>> res1 = SimpleMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(STDBarysheva, Block_And_Parallel_The_Same_5x5) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(5);
+  std::vector<std::vector<double>> B = GetRandomMatrix(5);
+  std::vector<std::vector<double>> res1 = BlockMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+TEST(STDBarysheva, Block_And_Parallel_The_Same_20x20) {
+  std::vector<std::vector<double>> A = GetRandomMatrix(20);
+  std::vector<std::vector<double>> B = GetRandomMatrix(20);
+  std::vector<std::vector<double>> res1 = BlockMultiplication(A, B);
+  std::vector<std::vector<double>> res2 = FoxParallel(A, B);
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+  ASSERT_EQ(CompareMatrix(res1, res2), true);
+}
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
 \end{lstlisting}
 \end{document}
